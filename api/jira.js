@@ -9,40 +9,60 @@ export default async function handler(req, res) {
     return res.status(200).end();
   }
 
-  const { filter = "full" } = req.query; // Default to 'full' if not provided
+  const { filter = "full" } = req.query;
   const email = process.env.JIRA_EMAIL;
   const token = process.env.JIRA_TOKEN;
   const auth = Buffer.from(`${email}:${token}`).toString("base64");
 
-  // Base JQL
+  // Build JQL
   let jql = "project=GMEBiz";
-
-  // Add time-based filters
   if (filter === "weekly") {
     jql += " AND updated >= -7d";
   } else if (filter === "monthly") {
     jql += " AND updated >= -30d";
   }
-
-  // Add sorting
   jql += " ORDER BY key DESC";
 
+  const maxResults = 100;
+  let startAt = 0;
+  let allIssues = [];
+
   try {
-    const url = `https://gmeremit-team.atlassian.net/rest/api/3/search?` + 
-      new URLSearchParams({
-        jql: jql,
-        maxResults: "1000",
+    while (true) {
+      const url = `https://gmeremit-team.atlassian.net/rest/api/3/search?` + 
+        new URLSearchParams({
+          jql,
+          maxResults: maxResults.toString(),
+          startAt: startAt.toString(),
+        });
+
+      const response = await fetch(url, {
+        headers: {
+          Authorization: `Basic ${auth}`,
+          Accept: "application/json",
+        },
       });
 
-    const response = await fetch(url, {
-      headers: {
-        Authorization: `Basic ${auth}`,
-        Accept: "application/json",
-      },
+      const data = await response.json();
+
+      if (!data.issues) {
+        return res.status(500).json({ error: "Unexpected Jira response", data });
+      }
+
+      allIssues.push(...data.issues);
+
+      if (data.startAt + data.maxResults >= data.total) {
+        break; // Fetched all
+      }
+
+      startAt += maxResults;
+    }
+
+    res.status(200).json({
+      total: allIssues.length,
+      issues: allIssues,
     });
 
-    const data = await response.json();
-    res.status(200).json(data);
   } catch (err) {
     res.status(500).json({ error: "Jira API error", message: err.message });
   }
