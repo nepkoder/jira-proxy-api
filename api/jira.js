@@ -17,13 +17,13 @@ export default async function handler(req, res) {
   // Build JQL
   let jql = "project=GMEBiz";
   if (filter === "weekly") {
-    jql += " AND updated >= -7d";
+    jql += " AND 'Start date[Date]' >= -7d";
   } else if (filter === "monthly") {
-    jql += " AND updated >= -30d";
+    jql += " AND 'Start date[Date]' >= -30d";
   }
   jql += " ORDER BY key DESC";
 
-  const maxResults = 100;
+  const maxResults = 10000;
   let startAt = 0;
   let allIssues = [];
 
