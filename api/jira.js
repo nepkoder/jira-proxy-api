@@ -9,7 +9,7 @@ export default async function handler(req, res) {
     return res.status(200).end();
   }
 
-  const { filter = "full",from, to } = req.query;
+  const { filter = "full",from, to, operation } = req.query;
   const email = process.env.JIRA_EMAIL;
   const token = process.env.JIRA_TOKEN;
   const auth = Buffer.from(`${email}:${token}`).toString("base64");
@@ -23,8 +23,10 @@ export default async function handler(req, res) {
   };
   const today = new Date();
 
+  const projectKey = operation === "true" ? "Operation Team" : "GMEBiz";
+
   // Build JQL
-  let jql = "project=GMEBiz";
+  let jql = `project=${projectKey}`;
   if (filter === "weekly") {
     const todayFormatted = formatDate(today);
     // Get last week's Sunday
