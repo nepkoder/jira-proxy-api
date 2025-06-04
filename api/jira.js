@@ -9,7 +9,7 @@ export default async function handler(req, res) {
     return res.status(200).end();
   }
 
-  const { filter = "full" } = req.query;
+  const { filter = "full",from, to } = req.query;
   const email = process.env.JIRA_EMAIL;
   const token = process.env.JIRA_TOKEN;
   const auth = Buffer.from(`${email}:${token}`).toString("base64");
@@ -36,6 +36,8 @@ export default async function handler(req, res) {
   } else if (filter === "monthly") {
     const lastMonthFirstDay = new Date(today.getFullYear(), today.getMonth() - 1, 1);
     jql += ` AND "Start date[Date]" >= "${formatDate(lastMonthFirstDay)}" AND "Start date[Date]" <= "${todayFormatted}"`;
+  } else if(filter === "custom" && from && to) {
+    jql += ` AND "Start date[Date]" >= "${formatDate(from)}" AND "Start date[Date]" <= "${formatDate(to)}"`;
   }
   jql += " ORDER BY created DESC";
 
