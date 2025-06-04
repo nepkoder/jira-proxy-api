@@ -21,21 +21,21 @@ export default async function handler(req, res) {
     const dd = String(date.getDate()).padStart(2, '0');
     return `${yyyy}-${mm}-${dd}`;
   };
+  const today = new Date();
 
   // Build JQL
   let jql = "project=GMEBiz";
   if (filter === "weekly") {
-
-    const today = new Date();
     const todayFormatted = formatDate(today);
     // Get last week's Sunday
     const day = today.getDay(); // 0 (Sun) to 6 (Sat)
     const lastSunday = new Date(today);
     lastSunday.setDate(today.getDate() - day - 7);
     jql += ` AND "Start date[Date]" >= "${formatDate(lastSunday)}" AND "Start date[Date]" <= "${todayFormatted}"`;
-    
+
   } else if (filter === "monthly") {
-    jql += " AND 'Start date[Date]' >= -30d";
+    const lastMonthFirstDay = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+    jql += ` AND "Start date[Date]" >= "${formatDate(lastMonthFirstDay)}" AND "Start date[Date]" <= "${todayFormatted}"`;
   }
   jql += " ORDER BY created DESC";
 
