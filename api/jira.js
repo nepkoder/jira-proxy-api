@@ -22,11 +22,11 @@ export default async function handler(req, res) {
     return `${yyyy}-${mm}-${dd}`;
   };
   const today = new Date();
+  const todayFormatted = formatDate(today);
 
   // Build JQL
   let jql = `project=${mode == "operation" ? "OT" : "GMEBiz"}`;
   if (filter === "weekly") {
-    const todayFormatted = formatDate(today);
     // Get last week's Sunday
     const day = today.getDay(); // 0 (Sun) to 6 (Sat)
     const lastSunday = new Date(today);
