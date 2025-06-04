@@ -14,10 +14,26 @@ export default async function handler(req, res) {
   const token = process.env.JIRA_TOKEN;
   const auth = Buffer.from(`${email}:${token}`).toString("base64");
 
+    // Helper: format date as YYYY-MM-DD
+  const formatDate = (date) => {
+    const yyyy = date.getFullYear();
+    const mm = String(date.getMonth() + 1).padStart(2, '0');
+    const dd = String(date.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  };
+
   // Build JQL
   let jql = "project=GMEBiz";
   if (filter === "weekly") {
-    jql += " AND 'Start date[Date]' >= -7d";
+
+    const today = new Date();
+    const todayFormatted = formatDate(today);
+    // Get last week's Sunday
+    const day = today.getDay(); // 0 (Sun) to 6 (Sat)
+    const lastSunday = new Date(today);
+    lastSunday.setDate(today.getDate() - day - 7);
+    jql += ` AND "Start date[Date]" >= "${formatDate(lastSunday)}" AND "Start date[Date]" <= "${todayFormatted}"`;
+    
   } else if (filter === "monthly") {
     jql += " AND 'Start date[Date]' >= -30d";
   }
