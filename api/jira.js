@@ -23,7 +23,7 @@ export default async function handler(req, res) {
   };
   const today = new Date();
 
-  const projectKey =  "OT";
+  const projectKey = operation == "true" ? "OT" : "GMEBiz";
 
   // Build JQL
   let jql = `project=${projectKey}`;
