@@ -9,7 +9,7 @@ export default async function handler(req, res) {
     return res.status(200).end();
   }
 
-  const { filter = "full",from, to, mode } = req.query;
+  const { filter = "full",from, to, mode, assignee = "All" } = req.query;
   const email = process.env.JIRA_EMAIL;
   const token = process.env.JIRA_TOKEN;
   const auth = Buffer.from(`${email}:${token}`).toString("base64");
@@ -38,6 +38,9 @@ export default async function handler(req, res) {
     jql += ` AND "Start date[Date]" >= "${formatDate(lastMonthFirstDay)}" AND "Start date[Date]" <= "${todayFormatted}"`;
   } else if(filter === "custom" && from && to) {
     jql += ` AND "Start date[Date]" >= "${formatDate(from)}" AND "Start date[Date]" <= "${formatDate(to)}"`;
+  }
+  if(assignee !== "All") {
+    jql += ` AND assignee = "${assignee}"`;
   }
   jql += " ORDER BY created DESC";
 
