@@ -8,34 +8,59 @@ export default async function handler(req, res) {
     return res.status(200).end();
   }
 
-  const { project = "GBP" } = req.query;
+  const { operation = false } = req.query;
 
   const email = process.env.JIRA_EMAIL;
   const token = process.env.JIRA_TOKEN;
   const auth = Buffer.from(`${email}:${token}`).toString("base64");
 
+  // Define projects
+  const projects = operation ? ["OT", "OPST"] : ["GBP"];
+
   try {
-    const url = `https://gmeremit-team.atlassian.net/rest/api/3/user/assignable/search?project=${project}`;
+    let allAssignees = [];
 
-    const response = await fetch(url, {
-      headers: {
-        Authorization: `Basic ${auth}`,
-        Accept: "application/json",
-      },
-    });
+    // Fetch from each project
+    for (const project of projects) {
+      const url = `https://gmeremit-team.atlassian.net/rest/api/3/user/assignable/search?project=${project}`;
 
-    const users = await response.json();
+      const response = await fetch(url, {
+        headers: {
+          Authorization: `Basic ${auth}`,
+          Accept: "application/json",
+        },
+      });
 
-    // Map users to simpler format
-    const assignees = users.map(user => ({
-      accountId: user.accountId,
-      name: user.displayName,
-      email: user.emailAddress, // optional
-    }));
+      if (!response.ok) {
+        throw new Error(`Failed to fetch for project ${project}: ${response.statusText}`);
+      }
 
-    res.status(200).json({ assignees });
+      const users = await response.json();
+
+      // Push unique users only
+      allAssignees.push(
+        ...users.map(user => ({
+          accountId: user.accountId,
+          name: user.displayName,
+          email: user.emailAddress,
+        }))
+      );
+    }
+
+    // Remove duplicates by accountId
+    const uniqueAssigneesMap = new Map();
+    allAssignees.forEach(user => uniqueAssigneesMap.set(user.accountId, user));
+
+    const uniqueSortedAssignees = Array.from(uniqueAssigneesMap.values()).sort((a, b) =>
+      a.name.localeCompare(b.name)
+    );
+
+    res.status(200).json({ assignees: uniqueSortedAssignees });
 
   } catch (err) {
-    res.status(500).json({ error: "Failed to fetch assignees", message: err.message });
+    res.status(500).json({
+      error: "Failed to fetch assignees",
+      message: err.message,
+    });
   }
 }
