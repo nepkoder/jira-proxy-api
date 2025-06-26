@@ -8,14 +8,14 @@ export default async function handler(req, res) {
     return res.status(200).end();
   }
 
-  const { operation = false } = req.query;
+  const { project = 'GBP' } = req.query;
 
   const email = process.env.JIRA_EMAIL;
   const token = process.env.JIRA_TOKEN;
   const auth = Buffer.from(`${email}:${token}`).toString("base64");
 
   // Define projects
-  const projects = operation ? ["OT", "OPST"] : ["GBP"];
+  const projects = project !== 'GBP' ? ["OT", "OPST"] : ["GBP"];
 
   try {
     let allAssignees = [];
