@@ -15,7 +15,7 @@ export default async function handler(req, res) {
   const auth = Buffer.from(`${email}:${token}`).toString("base64");
 
   // Define projects
-  const projects = project !== 'GBP' ? ["OT", "OPST"] : ["GBP"];
+  const projects = project !== 'GBP' ? ["OT"] : ["GBP"];
 
   try {
     let allAssignees = [];
