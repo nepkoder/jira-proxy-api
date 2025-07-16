@@ -20,9 +20,10 @@ export default async function handler(req, res) {
   try {
     let allAssignees = [];
 
-    // Fetch from each project
-    for (const project of projects) {
-      const url = `https://gmeremit-team.atlassian.net/rest/api/3/user/assignable/search?project=${project}`;
+    // Helper: Fetch assigned users in a project
+    const fetchAssignedUsers = async (projectKey) => {
+      const jql = `project = ${projectKey} AND assignee IS NOT EMPTY`;
+      const url = `https://gmeremit-team.atlassian.net/rest/api/3/search?jql=${encodeURIComponent(jql)}&fields=assignee&maxResults=1000`;
 
       const response = await fetch(url, {
         headers: {
@@ -32,22 +33,30 @@ export default async function handler(req, res) {
       });
 
       if (!response.ok) {
-        throw new Error(`Failed to fetch for project ${project}: ${response.statusText}`);
+        throw new Error(`Failed to fetch issues for project ${projectKey}: ${response.statusText}`);
       }
 
-      const users = await response.json();
+      const data = await response.json();
 
-      // Push unique users only
-      allAssignees.push(
-        ...users.map(user => ({
+      const assignees = data.issues
+        .map(issue => issue.fields.assignee)
+        .filter(Boolean)
+        .map(user => ({
           accountId: user.accountId,
           name: user.displayName,
-          email: user.emailAddress,
-        }))
-      );
+          email: user.emailAddress || "",
+        }));
+
+      return assignees;
+    };
+
+    // Fetch assigned users from each project
+    for (const projectKey of projects) {
+      const assignees = await fetchAssignedUsers(projectKey);
+      allAssignees.push(...assignees);
     }
 
-    // Remove duplicates by accountId
+    // Deduplicate by accountId
     const uniqueAssigneesMap = new Map();
     allAssignees.forEach(user => uniqueAssigneesMap.set(user.accountId, user));
 
@@ -59,7 +68,7 @@ export default async function handler(req, res) {
 
   } catch (err) {
     res.status(500).json({
-      error: "Failed to fetch assignees",
+      error: "Failed to fetch assigned users",
       message: err.message,
     });
   }
