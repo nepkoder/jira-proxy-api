@@ -25,7 +25,7 @@ export default async function handler(req, res) {
   const todayFormatted = formatDate(today);
 
   // Build JQL
-  let jql = `project in (${mode == "operation" ? "OT, OPST" : "GBP"})`;
+  let jql = `project in (${mode == "operation" ? "OT" : mode == 'GAT' ? 'GAT' : "GBP"})`;
   if (filter === "weekly") {
     // Get last week's Sunday
     const day = today.getDay(); // 0 (Sun) to 6 (Sat)
