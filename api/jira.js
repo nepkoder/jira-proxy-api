@@ -50,7 +50,7 @@ export default async function handler(req, res) {
 
   try {
     while (true) {
-      const url = `https://gmeremit-team.atlassian.net/rest/api/3/search?` + 
+      const url = `https://gmeremit-team.atlassian.net/rest/api/3/search/jql?` + 
         new URLSearchParams({
           jql,
           maxResults: maxResults.toString(),
