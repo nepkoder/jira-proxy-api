@@ -83,6 +83,7 @@ export default async function handler(req, res) {
     const maxResults = 1000; // Test higher value; reduce to 100 if rejected
     let allIssues = [];
     let nextPageToken = undefined;
+    let isLast = false;
     let retries = 3;
     const baseDelay = 1000;
 
@@ -127,8 +128,8 @@ export default async function handler(req, res) {
 
         console.log(`Fetched ${data.issues.length} issues for ${projectKey} (isLast: ${data.isLast})`);
         allIssues.push(...data.issues);
-
         nextPageToken = data.nextPageToken;
+        isLast = data.isLast || false;
         retries = 3; // Reset retries for next page
       } catch (err) {
         if (retries > 0) {
@@ -139,7 +140,7 @@ export default async function handler(req, res) {
         }
         throw err;
       }
-    } while (nextPageToken && !data.isLast); // Continue if there's a token and not the last page
+    } while (nextPageToken && !isLast); // Continue if there's a token and not the last page
 
     res.status(200).json({
       total: allIssues.length,
