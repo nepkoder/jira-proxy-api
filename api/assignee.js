@@ -1,56 +1,80 @@
 export default async function handler(req, res) {
   // CORS Headers
   res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET");
+  res.setHeader("Access-Control-Allow-Methods", "GET,OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
   if (req.method === "OPTIONS") {
     return res.status(200).end();
   }
 
-  const { project = 'GBP' } = req.query;
+  const { project = "GBP" } = req.query;
 
   const email = process.env.JIRA_EMAIL;
   const token = process.env.JIRA_TOKEN;
+
+  if (!email || !token) {
+    return res.status(500).json({ error: "Jira credentials not set in environment variables" });
+  }
+
   const auth = Buffer.from(`${email}:${token}`).toString("base64");
 
-  // Define projects
-  const projects = project !== 'GBP' ? ["OT"] : ["GBP"];
+  // Determine projects
+  const projects = project !== "GBP" ? ["OT"] : ["GBP"];
 
   try {
     let allAssignees = [];
 
-    // Helper: Fetch assigned users in a project
     const fetchAssignedUsers = async (projectKey) => {
-      const jql = `project = ${projectKey} AND assignee IS NOT EMPTY`;
-      const url = `https://gmeremit-team.atlassian.net/rest/api/3/search?jql=${encodeURIComponent(jql)}&fields=assignee&maxResults=1000`;
+      const maxResults = 100; // Pagination per request
+      let startAt = 0;
+      let assignees = [];
 
-      const response = await fetch(url, {
-        headers: {
-          Authorization: `Basic ${auth}`,
-          Accept: "application/json",
-        },
-      });
+      while (true) {
+        // Use POST /search/jql API
+        const response = await fetch(`https://gmeremit-team.atlassian.net/rest/api/3/search/jql`, {
+          method: "POST",
+          headers: {
+            Authorization: `Basic ${auth}`,
+            Accept: "application/json",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            jql: `project = ${projectKey} AND assignee IS NOT EMPTY`,
+            startAt,
+            maxResults,
+            fields: ["assignee"],
+          }),
+        });
 
-      if (!response.ok) {
-        throw new Error(`Failed to fetch issues for project ${projectKey}: ${response.statusText}`);
+        if (!response.ok) {
+          const text = await response.text();
+          throw new Error(`Failed to fetch issues for project ${projectKey}: ${text}`);
+        }
+
+        const data = await response.json();
+
+        const users = data.issues
+          .map(issue => issue.fields.assignee)
+          .filter(Boolean)
+          .map(user => ({
+            accountId: user.accountId,
+            name: user.displayName,
+            email: user.emailAddress || "",
+          }));
+
+        assignees.push(...users);
+
+        // Pagination check
+        if (data.startAt + data.maxResults >= data.total) break;
+
+        startAt += maxResults;
       }
-
-      const data = await response.json();
-
-      const assignees = data.issues
-        .map(issue => issue.fields.assignee)
-        .filter(Boolean)
-        .map(user => ({
-          accountId: user.accountId,
-          name: user.displayName,
-          email: user.emailAddress || "",
-        }));
 
       return assignees;
     };
 
-    // Fetch assigned users from each project
+    // Fetch assignees for all projects
     for (const projectKey of projects) {
       const assignees = await fetchAssignedUsers(projectKey);
       allAssignees.push(...assignees);
