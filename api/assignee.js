@@ -4,9 +4,7 @@ export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Methods", "GET,OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
-  if (req.method === "OPTIONS") {
-    return res.status(200).end();
-  }
+  if (req.method === "OPTIONS") return res.status(200).end();
 
   const { project = "GBP" } = req.query;
 
@@ -26,26 +24,30 @@ export default async function handler(req, res) {
     let allAssignees = [];
 
     const fetchAssignedUsers = async (projectKey) => {
-      const maxResults = 100; // Pagination per request
+      const maxResults = 100;
       let startAt = 0;
       let assignees = [];
 
       while (true) {
-        // Use POST /search/jql API
-        const response = await fetch(`https://gmeremit-team.atlassian.net/rest/api/3/search/jql`, {
-          method: "POST",
-          headers: {
-            Authorization: `Basic ${auth}`,
-            Accept: "application/json",
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            jql: `project = ${projectKey} AND assignee IS NOT EMPTY`,
-            startAt,
-            maxResults,
-            fields: ["assignee"],
-          }),
-        });
+        const requestBody = {
+          jql: `project = "${projectKey}" AND assignee IS NOT EMPTY ORDER BY assignee ASC`,
+          startAt,
+          maxResults,
+          fields: ["assignee"],
+        };
+
+        const response = await fetch(
+          "https://gmeremit-team.atlassian.net/rest/api/3/search/jql",
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Basic ${auth}`,
+              Accept: "application/json",
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(requestBody),
+          }
+        );
 
         if (!response.ok) {
           const text = await response.text();
@@ -65,9 +67,8 @@ export default async function handler(req, res) {
 
         assignees.push(...users);
 
-        // Pagination check
+        // Pagination
         if (data.startAt + data.maxResults >= data.total) break;
-
         startAt += maxResults;
       }
 
@@ -80,7 +81,7 @@ export default async function handler(req, res) {
       allAssignees.push(...assignees);
     }
 
-    // Deduplicate by accountId
+    // Deduplicate and sort
     const uniqueAssigneesMap = new Map();
     allAssignees.forEach(user => uniqueAssigneesMap.set(user.accountId, user));
 
