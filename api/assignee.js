@@ -33,7 +33,7 @@ export default async function handler(req, res) {
           jql: `project = "${projectKey}" AND assignee IS NOT EMPTY ORDER BY assignee ASC`,
           startAt,
           maxResults,
-          fields: ["assignee"],
+          fields: ["assignee"]
         };
 
         const response = await fetch(
@@ -43,9 +43,9 @@ export default async function handler(req, res) {
             headers: {
               Authorization: `Basic ${auth}`,
               Accept: "application/json",
-              "Content-Type": "application/json",
+              "Content-Type": "application/json"
             },
-            body: JSON.stringify(requestBody),
+            body: JSON.stringify(requestBody)
           }
         );
 
@@ -62,12 +62,11 @@ export default async function handler(req, res) {
           .map(user => ({
             accountId: user.accountId,
             name: user.displayName,
-            email: user.emailAddress || "",
+            email: user.emailAddress || ""
           }));
 
         assignees.push(...users);
 
-        // Pagination
         if (data.startAt + data.maxResults >= data.total) break;
         startAt += maxResults;
       }
@@ -75,13 +74,11 @@ export default async function handler(req, res) {
       return assignees;
     };
 
-    // Fetch assignees for all projects
     for (const projectKey of projects) {
       const assignees = await fetchAssignedUsers(projectKey);
       allAssignees.push(...assignees);
     }
 
-    // Deduplicate and sort
     const uniqueAssigneesMap = new Map();
     allAssignees.forEach(user => uniqueAssigneesMap.set(user.accountId, user));
 
@@ -94,7 +91,7 @@ export default async function handler(req, res) {
   } catch (err) {
     res.status(500).json({
       error: "Failed to fetch assigned users",
-      message: err.message,
+      message: err.message
     });
   }
 }
