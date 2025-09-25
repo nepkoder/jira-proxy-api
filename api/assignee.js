@@ -26,7 +26,7 @@ export default async function handler(req, res) {
 
   // Helper function to fetch assignees with optimized pagination
   async function fetchAssignees(projectKey, retries = 3, delay = 1000) {
-    const maxResults = 1000; // Test higher maxResults (adjust if server rejects)
+    const maxResults = 1000; // Adjust if server rejects
     let startAt = 0;
     const assignees = new Map(); // Deduplicate early
 
@@ -87,10 +87,14 @@ export default async function handler(req, res) {
 
   try {
     // Fetch assignees for all projects concurrently
-    const assigneePromises = projects.map(projectKey => fetchAssignees(projectKey));
-    const assigneesArrays = await Promise.all(assigneePromises.catch(err => {
-      throw new Error(`Failed to fetch assignees: ${err.message}`);
-    }));
+    const assigneesArrays = await Promise.all(
+      projects.map(projectKey =>
+        fetchAssignees(projectKey).catch(err => {
+          console.error(`Error fetching assignees for ${projectKey}: ${err.message}`);
+          return []; // Return empty array to continue with other projects
+        })
+      )
+    );
 
     // Combine and deduplicate assignees
     const uniqueAssigneesMap = new Map();
