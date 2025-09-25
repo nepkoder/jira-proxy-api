@@ -92,7 +92,7 @@ export default async function handler(req, res) {
         const requestBody = {
           jql,
           maxResults,
-          fields: ['summary', 'assignee', 'status', 'created', 'updated','subtasks'],
+          fields: ['*all'],
           fieldsByKeys: false,
         };
 
