@@ -33,7 +33,8 @@ export default async function handler(req, res) {
           jql: `project = "${projectKey}" AND assignee IS NOT EMPTY ORDER BY assignee ASC`,
           startAt,
           maxResults,
-          fields: ["assignee"]
+          fields: ["assignee"],
+          fieldsByKeys: true
         };
 
         const response = await fetch(
