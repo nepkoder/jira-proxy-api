@@ -19,7 +19,7 @@ export default async function handler(req, res) {
   // Validate mode
   const validModes = ['operation', 'GAT', 'GBP'];
   const projectKey = mode && validModes.includes(mode) ? (mode === 'operation' ? 'OT' : mode) : 'GBP';
-  
+
   // Validate assignee
   if (assignee !== 'All' && !/^[A-Za-z0-9_-]+$/.test(assignee)) {
     return res.status(400).json({ error: 'Invalid assignee. Use alphanumeric, underscore, or hyphen.' });
@@ -44,14 +44,14 @@ export default async function handler(req, res) {
   const auth = Buffer.from(`${email}:${token}`).toString('base64');
 
   // Helper: Format date as YYYY-MM-DD
-  const formatDate = (date) => {
-    const d = new Date(date);
-    if (isNaN(d.getTime())) {
-      throw new Error('Invalid date provided');
+  const formatDate = (dateInput) => {
+    const date = new Date(dateInput);
+    if (isNaN(date.getTime())) {
+      throw new Error(`Invalid date: ${dateInput}`);
     }
-    const yyyy = d.getFullYear();
-    const mm = String(d.getMonth() + 1).padStart(2, '0');
-    const dd = String(d.getDate()).padStart(2, '0');
+    const yyyy = date.getFullYear();
+    const mm = String(date.getMonth() + 1).padStart(2, '0');
+    const dd = String(date.getDate()).padStart(2, '0');
     return `${yyyy}-${mm}-${dd}`;
   };
 
@@ -79,51 +79,67 @@ export default async function handler(req, res) {
 
     jql += ' ORDER BY created DESC';
 
-    // Fetch issues with pagination and retry logic
+    // Fetch issues with cursor-based pagination and retry logic
     const maxResults = 1000; // Test higher value; reduce to 100 if rejected
-    let startAt = 0;
     let allIssues = [];
+    let nextPageToken = undefined;
+    let retries = 3;
+    const baseDelay = 1000;
 
-    while (true) {
-      const response = await fetch('https://gmeremit-team.atlassian.net/rest/api/3/search', {
-        method: 'POST',
-        headers: {
-          Authorization: `Basic ${auth}`,
-          Accept: 'application/json',
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
+    do {
+      try {
+        const requestBody = {
           jql,
-          startAt,
           maxResults,
           fields: ['summary', 'assignee', 'status', 'created', 'updated'],
-        }),
-      });
+          fieldsByKeys: false,
+        };
 
-      if (!response.ok) {
-        const text = await response.text();
-        if (response.status === 429) {
-          console.warn(`Rate limit hit. Retrying after 1000ms...`);
-          await new Promise(resolve => setTimeout(resolve, 1000));
-          continue; // Retry same request
+        if (nextPageToken) {
+          requestBody.nextPageToken = nextPageToken;
         }
-        throw new Error(`Failed to fetch issues for ${projectKey}: ${response.status} - ${text}`);
-      }
 
-      const data = await response.json();
-      if (!data.issues) {
-        throw new Error('Unexpected Jira response: No issues field');
-      }
+        const response = await fetch('https://gmeremit-team.atlassian.net/rest/api/3/search/jql', {
+          method: 'POST',
+          headers: {
+            Authorization: `Basic ${auth}`,
+            Accept: 'application/json',
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(requestBody),
+        });
 
-      console.log(`Fetched ${data.issues.length} issues at startAt=${startAt}`);
-      allIssues.push(...data.issues);
+        if (!response.ok) {
+          const text = await response.text();
+          if (response.status === 429 && retries > 0) {
+            console.warn(`Rate limit hit for ${projectKey}. Retrying after ${baseDelay}ms...`);
+            await new Promise(resolve => setTimeout(resolve, baseDelay));
+            retries--;
+            continue;
+          }
+          throw new Error(`Failed to fetch issues for ${projectKey}: ${response.status} - ${text}`);
+        }
 
-      if (data.startAt + data.issues.length >= data.total) {
-        console.log(`Completed fetching. Total issues: ${data.total}`);
-        break;
+        const data = await response.json();
+        if (!data.issues) {
+          throw new Error('Unexpected Jira response: No issues field');
+        }
+
+        console.log(`Fetched ${data.issues.length} issues for ${projectKey} (isLast: ${data.isLast})`);
+        allIssues.push(...data.issues);
+
+        nextPageToken = data.nextPageToken;
+        retries = 3; // Reset retries for next page
+      } catch (err) {
+        if (retries > 0) {
+          console.warn(`Error fetching issues for ${projectKey}. Retrying after ${baseDelay}ms...`);
+          await new Promise(resolve => setTimeout(resolve, baseDelay));
+          retries--;
+          continue;
+        }
+        throw err;
       }
-      startAt += maxResults;
-    }
+    } while (nextPageToken && !data.isLast); // Continue if there's a token and not the last page
 
     res.status(200).json({
       total: allIssues.length,
